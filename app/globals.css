@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fefefe;
+  --foreground: #1f2937;
+  --warm-gradient-from: #f9fafb;
+  --warm-gradient-to: #fefefe;
 }
 
 @theme inline {
@@ -22,5 +24,122 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  font-feature-settings: "kern" 1;
+  line-height: 1.6;
+}
+
+/* Enhanced button styles with warmer design */
+.btn-warm {
+  @apply inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-xl;
+  @apply transition-all duration-200 transform hover:scale-105;
+  @apply shadow-md hover:shadow-lg;
+}
+
+.btn-warm-primary {
+  @apply bg-gradient-to-r from-blue-500 to-blue-600 text-white;
+  @apply hover:from-blue-600 hover:to-blue-700;
+}
+
+.btn-warm-success {
+  @apply bg-gradient-to-r from-green-500 to-green-600 text-white;
+  @apply hover:from-green-600 hover:to-green-700;
+}
+
+.btn-warm-secondary {
+  @apply bg-white text-gray-700 border-gray-200;
+  @apply hover:bg-gray-50 hover:text-gray-900;
+}
+
+/* Enhanced card styles */
+.card-warm {
+  @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+  @apply transition-shadow duration-200 hover:shadow-md;
+}
+
+/* Improved focus states */
+input:focus,
+textarea:focus,
+select:focus {
+  @apply outline-none ring-2 ring-blue-500/50 border-blue-300;
+}
+
+/* Custom checkbox styling */
+input[type="checkbox"] {
+  @apply transition-colors duration-150;
+}
+
+/* Loading animation improvements */
+@keyframes warm-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-warm-spin {
+  animation: warm-spin 1s linear infinite;
+}
+
+/* Smooth transitions for interactive elements */
+.transition-warm {
+  @apply transition-all duration-200 ease-in-out;
+}
+
+/* Better text contrast */
+.text-warm-gray {
+  color: #374151;
+}
+
+.text-warm-gray-light {
+  color: #6b7280;
+}
+
+.text-warm-gray-dark {
+  color: #1f2937;
+}
+
+/* Gradient backgrounds */
+.bg-warm-gradient {
+  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 50%, #f3f4f6 100%);
+}
+
+.bg-warm-gradient-blue {
+  background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 50%, #f0f9ff 100%);
+}
+
+/* Enhanced shadows with warm undertones */
+.shadow-warm {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.shadow-warm-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* File tree enhancements */
+.file-tree-item {
+  @apply transition-colors duration-150 hover:bg-blue-50;
+}
+
+.file-tree-item:hover {
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+/* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-gray-100 rounded-full;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded-full hover:bg-gray-400;
 }
