@@ -54,9 +54,6 @@ const djangoOutputFormatter = (
 
   let output = `=== DJANGO PROJECT: ${projectName} ===\n`;
   output += `Framework: Django\n`;
-  if (apps.length > 0) {
-    output += `Apps detected: ${apps.join(", ")}\n`;
-  }
   output += `Selected files: ${selectedFiles.length}\n`;
   output += `Total characters: ${totalChars.toLocaleString()}\n\n`;
 
@@ -204,6 +201,40 @@ export const djangoConfig: FrameworkConfig = {
     "npm-debug.log*",
     "yarn-debug.log*",
     "yarn-error.log*",
+    // Test files
+    "*.test.py",
+    "*.spec.py",
+    "__tests__/",
+    "test_*.py",
+    "*_test.py",
+    "tests/",
+    // Configuration files
+    "*.config.js",
+    "*.config.ts",
+    ".eslintrc*",
+    ".prettierrc*",
+    "babel.config.js",
+    "pytest.ini",
+    "setup.cfg",
+    "tox.ini",
+    // Build and generated files
+    "coverage/",
+    "*.d.ts",
+    // Lock files and package managers
+    "package-lock.json",
+    "yarn.lock",
+    "Pipfile.lock",
+    "poetry.lock",
+    // Documentation and meta files
+    "*.md",
+    "README.md",
+    "LICENSE",
+    ".dockerignore",
+    "Dockerfile",
+    // Django-specific
+    "locale/",
+    "*.mo",
+    "*.pot",
   ],
   priorityFiles: [
     "manage.py",

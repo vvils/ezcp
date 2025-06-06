@@ -24,10 +24,10 @@ const languages: Language[] = [
   },
   {
     id: "javascript",
-    name: "JavaScript",
+    name: "JavaScript/TypeScript",
     icon: "🟨",
-    enabled: false,
-    description: "React, Vue, Node.js and more",
+    enabled: true,
+    description: "Next.js, React Native, Express.js and more",
   },
   {
     id: "java",

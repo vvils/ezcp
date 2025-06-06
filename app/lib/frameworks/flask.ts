@@ -129,6 +129,36 @@ export const flaskConfig: FrameworkConfig = {
     "*.egg-info/",
     "node_modules/",
     "npm-debug.log*",
+    // Test files
+    "*.test.py",
+    "*.spec.py",
+    "__tests__/",
+    "test_*.py",
+    "*_test.py",
+    "tests/",
+    // Configuration files
+    "*.config.js",
+    "*.config.ts",
+    ".eslintrc*",
+    ".prettierrc*",
+    "babel.config.js",
+    "pytest.ini",
+    "setup.cfg",
+    "tox.ini",
+    // Build and generated files
+    "coverage/",
+    "*.d.ts",
+    // Lock files and package managers
+    "package-lock.json",
+    "yarn.lock",
+    "Pipfile.lock",
+    "poetry.lock",
+    // Documentation and meta files
+    "*.md",
+    "README.md",
+    "LICENSE",
+    ".dockerignore",
+    "Dockerfile",
   ],
   priorityFiles: [
     "app.py",

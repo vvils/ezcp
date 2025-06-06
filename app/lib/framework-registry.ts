@@ -1,10 +1,14 @@
 import { FrameworkConfig } from "@/types/framework";
 import { djangoConfig } from "./frameworks/django";
 import { flaskConfig } from "./frameworks/flask";
+import { nextjsConfig } from "./frameworks/nextjs";
+import { expoConfig } from "./frameworks/expo";
 
 export const frameworks: FrameworkConfig[] = [
   djangoConfig,
   flaskConfig,
+  nextjsConfig,
+  expoConfig,
   // Future frameworks will be added here
 ];
 

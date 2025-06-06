@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { ProjectFile } from "@/types/framework";
 import {
   ChevronRight,
@@ -8,6 +8,9 @@ import {
   File,
   Folder,
   FolderOpen,
+  Search,
+  X,
+  Loader,
 } from "lucide-react";
 
 interface FileTreeProps {
@@ -26,6 +29,8 @@ interface TreeNode {
   expanded: boolean;
   selected: boolean;
   indeterminate?: boolean;
+  matchesSearch?: boolean;
+  hasMatchingChildren?: boolean;
 }
 
 export function FileTree({
@@ -37,8 +42,110 @@ export function FileTree({
   const [expandedDirs, setExpandedDirs] = React.useState<Set<string>>(
     new Set()
   );
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<Set<string>>(new Set());
+  const [searchDebounceTimeout, setSearchDebounceTimeout] =
+    useState<NodeJS.Timeout | null>(null);
 
-  const tree = React.useMemo(() => buildTree(files), [files]);
+  // Debounced search function
+  const performSearch = useCallback(
+    async (term: string) => {
+      if (!term.trim()) {
+        setSearchResults(new Set());
+        setIsSearching(false);
+        return;
+      }
+
+      setIsSearching(true);
+
+      try {
+        // Simulate search delay and scan file contents
+        const matchingFiles = new Set<string>();
+        const searchLower = term.toLowerCase();
+
+        for (const file of files) {
+          if (!file.isDirectory) {
+            // Search in file content and filename
+            const contentMatches = file.content
+              .toLowerCase()
+              .includes(searchLower);
+            const nameMatches = file.name.toLowerCase().includes(searchLower);
+            const pathMatches = file.relativePath
+              .toLowerCase()
+              .includes(searchLower);
+
+            if (contentMatches || nameMatches || pathMatches) {
+              matchingFiles.add(file.relativePath);
+            }
+          }
+        }
+
+        setSearchResults(matchingFiles);
+      } catch (error) {
+        console.error("Search error:", error);
+        setSearchResults(new Set());
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [files]
+  );
+
+  // Handle search input with debouncing
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      setSearchTerm(value);
+
+      // Clear existing timeout
+      if (searchDebounceTimeout) {
+        clearTimeout(searchDebounceTimeout);
+      }
+
+      // Set new timeout
+      const timeout = setTimeout(() => {
+        performSearch(value);
+      }, 300);
+
+      setSearchDebounceTimeout(timeout);
+    },
+    [searchDebounceTimeout, performSearch]
+  );
+
+  const clearSearch = useCallback(() => {
+    setSearchTerm("");
+    setSearchResults(new Set());
+    setIsSearching(false);
+    if (searchDebounceTimeout) {
+      clearTimeout(searchDebounceTimeout);
+    }
+  }, [searchDebounceTimeout]);
+
+  // Filter files based on search
+  const filteredFiles = useMemo(() => {
+    if (!searchTerm.trim() || searchResults.size === 0) {
+      return files;
+    }
+
+    return files.filter((file) => {
+      if (file.isDirectory) {
+        // Include directories that contain matching files
+        return files.some(
+          (f) =>
+            !f.isDirectory &&
+            f.relativePath.startsWith(file.relativePath + "/") &&
+            searchResults.has(f.relativePath)
+        );
+      } else {
+        return searchResults.has(file.relativePath);
+      }
+    });
+  }, [files, searchTerm, searchResults]);
+
+  const tree = React.useMemo(
+    () => buildTreeWithSearch(filteredFiles, searchResults),
+    [filteredFiles, searchResults]
+  );
 
   // Auto-expand first level directories on initial load only
   React.useEffect(() => {
@@ -49,6 +156,24 @@ export function FileTree({
       setExpandedDirs(new Set(firstLevelDirs));
     }
   }, [tree, expandedDirs.size]);
+
+  // Auto-expand directories with search matches
+  React.useEffect(() => {
+    if (searchResults.size > 0) {
+      const dirsToExpand = new Set(expandedDirs);
+      searchResults.forEach((filePath) => {
+        const pathParts = filePath.split("/");
+        let currentPath = "";
+        for (let i = 0; i < pathParts.length - 1; i++) {
+          currentPath = currentPath
+            ? `${currentPath}/${pathParts[i]}`
+            : pathParts[i];
+          dirsToExpand.add(currentPath);
+        }
+      });
+      setExpandedDirs(dirsToExpand);
+    }
+  }, [searchResults, expandedDirs]);
 
   const toggleDirectory = (path: string) => {
     const newExpanded = new Set(expandedDirs);
@@ -61,7 +186,7 @@ export function FileTree({
   };
 
   const handleDirectoryToggle = (dirPath: string) => {
-    const dirFiles = files.filter(
+    const dirFiles = filteredFiles.filter(
       (file) =>
         file.relativePath.startsWith(dirPath + "/") ||
         file.relativePath === dirPath
@@ -78,7 +203,7 @@ export function FileTree({
   };
 
   const getDirectoryState = (dirPath: string) => {
-    const dirFiles = files.filter((file) =>
+    const dirFiles = filteredFiles.filter((file) =>
       file.relativePath.startsWith(dirPath + "/")
     );
 
@@ -92,15 +217,72 @@ export function FileTree({
     return { selected: false, indeterminate: true };
   };
 
-  const selectedCount = files.filter((f) => f.selected).length;
-  const totalCount = files.length;
+  const selectedCount = filteredFiles.filter((f) => f.selected).length;
+  const totalCount = filteredFiles.length;
+  const originalTotalCount = files.length;
+
+  // Calculate token and character counts for selected files
+  const selectedFiles = filteredFiles.filter((f) => f.selected);
+  const totalCharacters = selectedFiles.reduce(
+    (sum, file) => sum + file.content.length,
+    0
+  );
+  const estimatedTokens = Math.ceil(totalCharacters / 4);
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      {/* Search Header */}
+      <div className="p-4 bg-gray-50 border-b border-gray-200">
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            {isSearching ? (
+              <Loader className="h-4 w-4 text-gray-400 animate-spin" />
+            ) : (
+              <Search className="h-4 w-4 text-gray-400" />
+            )}
+          </div>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            placeholder="Search files by content, name, or path..."
+            className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          {searchTerm && (
+            <button
+              onClick={clearSearch}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+            >
+              <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+            </button>
+          )}
+        </div>
+
+        {searchTerm && (
+          <div className="mt-2 text-xs text-gray-600">
+            {isSearching
+              ? "Searching..."
+              : searchResults.size > 0
+              ? `Found ${searchResults.size} matching file${
+                  searchResults.size === 1 ? "" : "s"
+                }`
+              : "No files match your search"}
+          </div>
+        )}
+      </div>
+
+      {/* File Count Header */}
       <div className="flex justify-between items-center p-6 bg-gray-50 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900">
-          Project Files ({selectedCount}/{totalCount})
-        </h3>
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">
+            Project Files ({selectedCount}/{totalCount}
+            {totalCount !== originalTotalCount && ` of ${originalTotalCount}`})
+          </h3>
+          <p className="text-sm text-gray-600 mt-1">
+            ~{estimatedTokens.toLocaleString()} tokens (
+            {totalCharacters.toLocaleString()} characters)
+          </p>
+        </div>
         <div className="space-x-3">
           <button
             onClick={onSelectAll}
@@ -118,20 +300,42 @@ export function FileTree({
       </div>
 
       <div className="max-h-[32rem] overflow-y-auto">
-        {renderTree(
-          tree,
-          expandedDirs,
-          toggleDirectory,
-          onFileToggle,
-          handleDirectoryToggle,
-          getDirectoryState
+        {tree.length > 0 ? (
+          renderTree(
+            tree,
+            expandedDirs,
+            toggleDirectory,
+            onFileToggle,
+            handleDirectoryToggle,
+            getDirectoryState,
+            searchResults
+          )
+        ) : searchTerm && !isSearching ? (
+          <div className="p-8 text-center text-gray-500">
+            <Search className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+            <p>No files match your search criteria.</p>
+            <button
+              onClick={clearSearch}
+              className="mt-2 text-blue-500 hover:text-blue-600 text-sm"
+            >
+              Clear search to view all files
+            </button>
+          </div>
+        ) : (
+          <div className="p-8 text-center text-gray-500">
+            <Folder className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+            <p>No files to display.</p>
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-function buildTree(files: ProjectFile[]): TreeNode[] {
+function buildTreeWithSearch(
+  files: ProjectFile[],
+  searchResults: Set<string>
+): TreeNode[] {
   const root: TreeNode[] = [];
   const nodeMap = new Map<string, TreeNode>();
 
@@ -147,14 +351,19 @@ function buildTree(files: ProjectFile[]): TreeNode[] {
 
       let node = nodeMap.get(currentPath);
       if (!node) {
+        const matchesSearch =
+          !file.isDirectory && searchResults.has(file.relativePath);
+
         node = {
           name: part,
           path: currentPath,
           isDirectory: !isLast,
           children: [],
           file: isLast ? file : undefined,
-          expanded: true, // Default to expanded for better UX
+          expanded: true,
           selected: isLast ? file?.selected || false : false,
+          matchesSearch,
+          hasMatchingChildren: false,
         };
         nodeMap.set(currentPath, node);
         currentLevel.push(node);
@@ -165,6 +374,23 @@ function buildTree(files: ProjectFile[]): TreeNode[] {
       }
     });
   });
+
+  // Mark directories that have matching children
+  const markDirectoriesWithMatches = (nodes: TreeNode[]): boolean => {
+    let hasMatches = false;
+    for (const node of nodes) {
+      if (node.isDirectory) {
+        const childrenHaveMatches = markDirectoriesWithMatches(node.children);
+        node.hasMatchingChildren = childrenHaveMatches;
+        if (childrenHaveMatches) hasMatches = true;
+      } else if (node.matchesSearch) {
+        hasMatches = true;
+      }
+    }
+    return hasMatches;
+  };
+
+  markDirectoriesWithMatches(root);
 
   return sortTree(root);
 }
@@ -193,97 +419,149 @@ function renderTree(
     selected: boolean;
     indeterminate: boolean;
   },
+  searchResults: Set<string>,
   depth: number = 0
 ): React.ReactNode {
   return nodes.map((node) => {
-    const dirState = node.isDirectory ? getDirectoryState(node.path) : null;
+    const isExpanded = expandedDirs.has(node.path);
+    const hasSearchMatch = node.matchesSearch || node.hasMatchingChildren;
 
     return (
       <div key={node.path}>
         <div
-          className={`flex items-center py-2 px-4 hover:bg-blue-50 transition-colors ${
-            depth > 0 ? "border-l-2 border-gray-100 ml-4" : ""
+          className={`flex items-center py-2 px-4 hover:bg-gray-50 border-b border-gray-100 ${
+            hasSearchMatch ? "bg-yellow-50" : ""
           }`}
-          style={{ paddingLeft: `${depth * 20 + 16}px` }}
+          style={{ paddingLeft: `${1 + depth * 1.5}rem` }}
         >
           {node.isDirectory ? (
             <>
-              <input
-                type="checkbox"
-                checked={dirState?.selected || false}
-                ref={(el) => {
-                  if (el && dirState?.indeterminate) {
-                    el.indeterminate = true;
-                  }
-                }}
-                onChange={() => handleDirectoryToggle(node.path)}
-                className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
               <button
                 onClick={() => toggleDirectory(node.path)}
-                className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 min-w-0 flex-1"
+                className="mr-2 p-1 hover:bg-gray-200 rounded transition-colors"
               >
-                {expandedDirs.has(node.path) ? (
-                  <ChevronDown className="w-4 h-4 text-gray-500" />
+                {isExpanded ? (
+                  <ChevronDown className="h-4 w-4 text-gray-600" />
                 ) : (
-                  <ChevronRight className="w-4 h-4 text-gray-500" />
+                  <ChevronRight className="h-4 w-4 text-gray-600" />
                 )}
-                {expandedDirs.has(node.path) ? (
-                  <FolderOpen className="w-5 h-5 text-blue-500" />
-                ) : (
-                  <Folder className="w-5 h-5 text-blue-500" />
-                )}
-                <span className="font-medium text-gray-900 truncate">
-                  {node.name}
-                </span>
               </button>
+
+              <div className="flex items-center flex-1 min-w-0">
+                {isExpanded ? (
+                  <FolderOpen className="h-5 w-5 text-blue-500 mr-3 flex-shrink-0" />
+                ) : (
+                  <Folder className="h-5 w-5 text-blue-500 mr-3 flex-shrink-0" />
+                )}
+
+                <div className="flex items-center justify-between flex-1 min-w-0">
+                  <span
+                    className={`text-sm font-medium text-gray-900 truncate ${
+                      hasSearchMatch ? "text-yellow-800" : ""
+                    }`}
+                  >
+                    {node.name}
+                    {node.hasMatchingChildren && searchResults.size > 0 && (
+                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                        contains matches
+                      </span>
+                    )}
+                  </span>
+
+                  <div className="flex items-center ml-3">
+                    <input
+                      type="checkbox"
+                      checked={getDirectoryState(node.path).selected}
+                      ref={(input) => {
+                        if (input) {
+                          input.indeterminate = getDirectoryState(
+                            node.path
+                          ).indeterminate;
+                        }
+                      }}
+                      onChange={() => handleDirectoryToggle(node.path)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                  </div>
+                </div>
+              </div>
             </>
           ) : (
             <>
-              <div className="w-4 mr-3" /> {/* Spacer for alignment */}
-              <input
-                type="checkbox"
-                checked={node.file?.selected || false}
-                onChange={() => node.file && onFileToggle(node.file)}
-                className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <File className={`w-4 h-4 mr-2 ${getFileIcon(node.name)}`} />
-              <div className="flex items-center justify-between w-full min-w-0">
-                <span
-                  className={`${getPriorityClass(node.file?.priority)} ${
-                    node.file?.app ? "italic" : ""
-                  } truncate`}
-                >
-                  {node.name}
-                  {node.file?.app && (
-                    <span className="text-xs text-blue-600 ml-1">
-                      ({node.file.app})
+              <div className="w-6 mr-2"></div>
+              <div className="flex items-center flex-1 min-w-0">
+                <div className="flex-shrink-0 mr-3">
+                  <File
+                    className={`h-4 w-4 ${
+                      hasSearchMatch ? "text-yellow-600" : "text-gray-400"
+                    }`}
+                  />
+                  <span className="text-xs ml-1">{getFileIcon(node.name)}</span>
+                </div>
+
+                <div className="flex items-center justify-between flex-1 min-w-0">
+                  <div className="flex flex-col min-w-0">
+                    <span
+                      className={`text-sm text-gray-700 truncate ${
+                        hasSearchMatch ? "font-medium text-yellow-800" : ""
+                      }`}
+                    >
+                      {node.name}
+                      {hasSearchMatch && searchResults.size > 0 && (
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                          match
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
-                <span className="ml-4 text-xs text-gray-500 flex-shrink-0">
-                  {formatFileSize(node.file?.size || 0)}
-                </span>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <span className="text-xs text-gray-500">
+                        {formatFileSize(node.file?.size || 0)}
+                      </span>
+                      {node.file?.priority && (
+                        <span
+                          className={`text-xs px-1.5 py-0.5 rounded ${getPriorityClass(
+                            node.file.priority
+                          )}`}
+                        >
+                          {node.file.priority}
+                        </span>
+                      )}
+                      {node.file?.app && (
+                        <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                          {node.file.app}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center ml-3">
+                    <input
+                      type="checkbox"
+                      checked={node.file?.selected || false}
+                      onChange={() => node.file && onFileToggle(node.file)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                  </div>
+                </div>
               </div>
             </>
           )}
         </div>
 
-        {node.isDirectory &&
-          expandedDirs.has(node.path) &&
-          node.children.length > 0 && (
-            <div>
-              {renderTree(
-                node.children,
-                expandedDirs,
-                toggleDirectory,
-                onFileToggle,
-                handleDirectoryToggle,
-                getDirectoryState,
-                depth + 1
-              )}
-            </div>
-          )}
+        {node.isDirectory && isExpanded && (
+          <div>
+            {renderTree(
+              node.children,
+              expandedDirs,
+              toggleDirectory,
+              onFileToggle,
+              handleDirectoryToggle,
+              getDirectoryState,
+              searchResults,
+              depth + 1
+            )}
+          </div>
+        )}
       </div>
     );
   });

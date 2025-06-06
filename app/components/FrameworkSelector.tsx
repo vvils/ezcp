@@ -47,6 +47,44 @@ const frameworksByLanguage: Record<string, Framework[]> = {
       route: "/python/fastapi",
     },
   ],
+  javascript: [
+    {
+      id: "nextjs",
+      name: "Next.js",
+      icon: "⚡",
+      enabled: true,
+      status: "available",
+      description: "React framework for production",
+      route: "/javascript/nextjs",
+    },
+    {
+      id: "expo",
+      name: "Expo",
+      icon: "📱",
+      enabled: true,
+      status: "available",
+      description: "Universal React Native platform",
+      route: "/javascript/expo",
+    },
+    {
+      id: "react-native-cli",
+      name: "React Native CLI",
+      icon: "📱",
+      enabled: false,
+      status: "coming-soon",
+      description: "Native React development",
+      route: "/javascript/react-native-cli",
+    },
+    {
+      id: "expressjs",
+      name: "Express.js",
+      icon: "🚀",
+      enabled: false,
+      status: "coming-soon",
+      description: "Fast Node.js web framework",
+      route: "/javascript/expressjs",
+    },
+  ],
 };
 
 export function FrameworkSelector({ languageId }: FrameworkSelectorProps) {
